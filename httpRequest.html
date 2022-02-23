@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Welcome to XMLHttpRequest test</title>
+ 
+    <style>
+    #getButton, #resetButton{
+        cursor: pointer;
+        color: red;
+    }
+    #description {
+        font-weight: bold;
+    }
+    </style>
+  </head>
+
+  <body>
+
+    <div id="description"></div>
+    <div id="results"></div>
+    <br>
+    <div id="getButton">GET DATA</div>
+    <br>
+    <div id="resetButton">RESET</div>
+
+    <script>
+
+    storage = window.localStorage; // define localStorage
+
+    // Actions for the buttons
+    document.getElementById('resetButton').addEventListener('click', reset);
+    document.getElementById('getButton').addEventListener('click', getData);
+
+    function reset() {
+        window.localStorage.removeItem("companyData");
+        delete company;
+        document.getElementById("description").textContent = "You can test again with GET DATA -option";
+        document.getElementById("results").textContent = "";
+        console.log("Reset...");
+    }
+
+    // Functions for requesting data from api
+    const api_url = "https://avoindata.prh.fi/bis/v1/2532004-3";
+    function getData() {
+        console.log("Fetching data from api");
+
+        // Start the request
+        const xhttp = new XMLHttpRequest();
+        xhttp.open("GET", api_url);
+        xhttp.onload = function() {
+            if(xhttp.status === 200) {
+                const data = JSON.parse(xhttp.response);
+
+                // Processing results
+                let company = {};
+
+                // If saved data exist -> Update if needed
+                if(window.localStorage.getItem("companyData")) {
+                    console.log("Checking if there is need for the updates");
+                    companyData = JSON.parse(window.localStorage.getItem("companyData"));
+                    let businessId = companyData.business_id, businessName = companyData.name, businessAddress = companyData.address, businessPhone = companyData.phone, businessWebsite = companyData.website, businessDate = companyData.date; 
+                    let i = 0, updateDate = companyData.date;
+
+                    // Check business id
+                    while(businessId.length == 0) {
+                        if(data.results[i].registrationDate > updateDate || businessId.length == 0) {
+                            updateDate = data.results[i].registrationDate;
+                            businessId = data.results[i].businessId;
+                            if(updateDate > businessDate) {
+                                businessDate = updateDate;
+                            }
+                        }
+                        i++;
+                    }
+                    i = 0, updateDate = companyData.date;
+
+                    // Check business name
+                    while(typeof data.results[0].names[i] !== 'undefined') {
+                        if(data.results[0].names[i].registrationDate > updateDate) {
+                            updateDate = data.results[0].names[i].registrationDate;
+                            businessName = data.results[0].names[i].name;
+                            if(updateDate > businessDate) {
+                                businessDate = updateDate;
+                            }
+                        }
+                        i++;
+                    }
+                    i = 0, updateDate = companyData.date;
+
+                    // Check address
+                    while(typeof data.results[0].addresses[i] !== 'undefined') {
+                        if(data.results[0].addresses[i].registrationDate > updateDate && data.results[0].addresses[i].street !== null && data.results[0].addresses[i].postCode !== null && data.results[0].addresses[i].city !== null) {
+                            updateDate = data.results[0].addresses[i].registrationDate;
+                            businessAddress = data.results[0].addresses[i].street + ", " + data.results[0].addresses[i].postCode + " " + data.results[0].addresses[i].city;
+                            if(updateDate > businessDate) {
+                                businessDate = updateDate;
+                            } 
+                        }
+                        i++;
+                    }
+                    i = 0, updateDate = companyData.date;
+
+                    // Check phone
+                    while(typeof data.results[0].contactDetails[i] !== 'undefined') {
+                        if(data.results[0].contactDetails[i].registrationDate > updateDate && data.results[0].contactDetails[i].type == "Puhelin") {
+                            updateDate = data.results[0].contactDetails[i].registrationDate;
+                            businessWebsite = data.results[0].contactDetails[i].value;
+                            if(updateDate > businessDate) {
+                                businessDate = updateDate;
+                            } 
+                        }
+                        i++;
+                    }
+                    i = 0, updateDate = companyData.date;
+
+                    // Check website
+                    while(typeof data.results[0].contactDetails[i] !== 'undefined') {
+                        if(data.results[0].contactDetails[i].registrationDate > updateDate && data.results[0].contactDetails[i].type == "Kotisivun www-osoite") {
+                            updateDate = data.results[0].contactDetails[i].registrationDate;
+                            businessWebsite = data.results[0].contactDetails[i].value;
+                            if(updateDate > businessDate) {
+                                businessDate = updateDate;
+                            } 
+                        }
+                        i++;
+                    }
+                    i = 0, updateDate = companyData.date;
+
+                    // Defining object with updated values
+                    company = {
+                        "business_id": businessId,
+                        "name": businessName,
+                        "address": businessAddress,
+                        "phone": businessPhone,
+                        "website": businessWebsite,
+                        "date": businessDate
+                    }	    
+
+                    // Display some text for users
+                    console.log("Data updated with latest info");
+                    document.getElementById("description").textContent = "Let's update to latest existing info...";
+                }
+                // No saved data found, so then use api data
+                else {
+                    company = {
+                        "business_id": data.results[0].businessId,
+                        "name": data.results[0].name,
+                        "address": data.results[0].addresses[2].street + ", " + data.results[0].addresses[2].postCode + " " + data.results[0].addresses[2].city + "",
+                        "phone": data.results[0].contactDetails[4].value,
+                        "website": data.results[0].contactDetails[13].value,
+                        "date": data.results[0].registrationDate
+                    }
+                    document.getElementById("description").textContent = "For first... older info from api. Click GET DATA -option again to update.";
+                }
+
+                // Save the data
+                console.log("Saving data to localStorage");
+                window.localStorage.setItem("companyData", JSON.stringify(company));
+
+                // Show result
+                console.log("Show result");
+                document.getElementById("results").textContent = JSON.stringify(company);
+            } 
+            else {
+                // Show errors
+                console.log(`error ${xhttp.status}`);
+            }
+        }
+        xhttp.send(); // Send request
+    }
+    getData(); // Run the function
+    </script>
+  </body>
+</html>
